@@ -1,0 +1,10 @@
+---
+netscalers:
+    vpx-vd05:
+        ip: 10.x.x.x
+        user: 'changeme'
+        pass: 'changeme'
+    another-ns:
+        ip: 10.x.x.x
+        user: 'changeme'
+        pass: 'changeme'

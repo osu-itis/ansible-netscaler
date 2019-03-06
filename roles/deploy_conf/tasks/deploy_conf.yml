@@ -1,0 +1,61 @@
+---
+- set_fact:
+    netscaler_name: "{{ item.key }}"
+    netscaler: "{{ item.value }}"
+
+- set_fact:
+    new_conf_file: "/tmp/ns.conf-{{ netscaler_name }}"
+    nsconfig_dir: "/nsconfig"
+
+- debug:
+    msg: "{{ debug_item }}"
+  loop: [ "{{ netscaler }}", "{{ netscaler_name }}", "{{ new_conf_file }}", "{{ nsconfig_dir }}" ]
+  loop_control:
+    loop_var: debug_item
+
+- debug:
+    msg: "http://{{ netscaler.ip }}/nitro/v1/config/systemfile?args=filename:ns.conf,filelocation:{{ nsconfig_dir | replace('/','%2F') }}"
+
+- name: generate ns.conf from template
+  template:
+    src: "../../confs/ns.conf-{{ netscaler_name }}.j2"
+    dest: "{{ new_conf_file }}"
+
+- name: delete old ns.conf
+  uri:
+    url: "http://{{ netscaler.ip }}/nitro/v1/config/systemfile?args=filename:ns.conf,filelocation:{{ nsconfig_dir | replace('/','%2F') }}"
+    method: DELETE
+    status_code: 200
+    return_content: yes
+    headers:
+      X-NITRO-USER: "{{ netscaler.user }}"
+      X-NITRO-PASS: "{{ netscaler.pass }}"
+
+- name: upload new ns.conf
+  uri:
+    url: "http://{{ netscaler.ip }}/nitro/v1/config/systemfile"
+    method: POST
+    status_code: 201
+    return_content: yes
+    headers:
+      X-NITRO-USER: "{{ netscaler.user }}"
+      X-NITRO-PASS: "{{ netscaler.pass }}"
+    body_format: json
+    body:
+      systemfile:
+        filename: "ns.conf"
+        filecontent: "{{ lookup('file', new_conf_file) | b64encode }}"
+        filelocation: "{{ nsconfig_dir }}"
+
+- name: warm reboot NetScaler
+  uri:
+    url: "http://{{ netscaler.ip }}/nitro/v1/config/reboot"
+    method: POST
+    status_code: 201
+    headers:
+      X-NITRO-USER: "{{ netscaler.user }}"
+      X-NITRO-PASS: "{{ netscaler.pass }}"
+    body_format: json
+    body:
+      reboot:
+        warm: yes
